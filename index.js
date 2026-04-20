@@ -3,6 +3,7 @@ const { Low, JSONFile } = require('lowdb')
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
+// Database
 const db = new Low(new JSONFile('db.json'))
 
 async function initDB() {
@@ -10,7 +11,7 @@ async function initDB() {
   db.data ||= { users: {} }
 }
 
-// ambil email rolling
+// Rolling email system
 function getNextEmail(user) {
   if (!user.emails || user.emails.length === 0) return null
 
@@ -20,7 +21,7 @@ function getNextEmail(user) {
   return email
 }
 
-// TEMPLATE
+// Templates
 const templates = {
   login: `Dear WhatsApp Support Team,
 
@@ -30,7 +31,7 @@ I am writing to kindly request assistance with my WhatsApp account. I am current
 
 Below are my account details:
 • Email          : {email}
-• Phone Number   : {nomor}
+• Phone Number   : {number}
 
 I would greatly appreciate it if you could help me resolve this login issue so I can regain access to my account as soon as possible.
 
@@ -44,111 +45,115 @@ I am reaching out to appeal the restriction on my WhatsApp account. When I try t
 
 Here are my account details:
 • Email          : {email}
-• Phone Number   : {nomor}
+• Phone Number   : {number}
 
 I believe this may have been a mistake or I may have unintentionally violated a policy. I would really appreciate it if you could review my account and help lift the restriction so I can continue using WhatsApp normally.
 
 Thank you for your understanding and for taking the time to assist me. I am looking forward to your positive response.`
 }
 
-// START
-bot.start((ctx) => {
+// Temporary state
+const userState = {}
+
+// Start
+bot.start(async (ctx) => {
+  await initDB()
+
   ctx.reply(
-    'MENU:',
+    'Main Menu:',
     Markup.keyboard([
-      ['📧 Tambah Email'],
-      ['📋 Lihat Email'],
-      ['📝 Buat Pesan']
+      ['➕ Add Email'],
+      ['📋 View Emails'],
+      ['📝 Generate Message']
     ]).resize()
   )
 })
 
-// TAMBAH EMAIL
-bot.hears('📧 Tambah Email', (ctx) => {
-  ctx.reply('Masukkan email:')
+// Add Email
+bot.hears('➕ Add Email', (ctx) => {
+  userState[ctx.from.id] = 'awaiting_email'
+  ctx.reply('Please enter your email:')
+})
 
-  bot.once('text', async (ctx2) => {
-    await initDB()
+// View Emails
+bot.hears('📋 View Emails', async (ctx) => {
+  await initDB()
 
-    const id = ctx2.from.id
+  const user = db.data.users[ctx.from.id]
+
+  if (!user || user.emails.length === 0) {
+    return ctx.reply('No emails saved ❌')
+  }
+
+  ctx.reply('Your emails:\n\n' + user.emails.join('\n'))
+})
+
+// Generate Message
+bot.hears('📝 Generate Message', (ctx) => {
+  userState[ctx.from.id] = 'choose_template'
+
+  ctx.reply(
+    'Select issue type:',
+    Markup.keyboard([
+      ['Login Issue'],
+      ['Account Restricted']
+    ]).resize()
+  )
+})
+
+// Handle template selection
+bot.hears(['Login Issue', 'Account Restricted'], (ctx) => {
+  const type = ctx.message.text === 'Login Issue' ? 'login' : 'restricted'
+
+  userState[ctx.from.id] = { step: 'awaiting_number', type }
+
+  ctx.reply('Enter phone number:')
+})
+
+// Handle all text input
+bot.on('text', async (ctx) => {
+  await initDB()
+
+  const state = userState[ctx.from.id]
+
+  if (!state) return
+
+  const id = ctx.from.id
+
+  // Save email
+  if (state === 'awaiting_email') {
     db.data.users[id] ||= { emails: [] }
 
-    db.data.users[id].emails.push(ctx2.message.text)
+    db.data.users[id].emails.push(ctx.message.text)
     await db.write()
 
-    ctx2.reply('Email ditambahkan ✅')
-  })
-})
+    userState[id] = null
 
-// LIHAT EMAIL
-bot.hears('📋 Lihat Email', async (ctx) => {
-  await initDB()
-
-  const user = db.data.users[ctx.from.id]
-  if (!user || user.emails.length === 0) {
-    return ctx.reply('Belum ada email ❌')
+    return ctx.reply('Email added successfully ✅')
   }
 
-  ctx.reply(user.emails.join('\n'))
-})
+  // Generate message
+  if (state.step === 'awaiting_number') {
+    const user = db.data.users[id]
 
-// BUAT PESAN
-bot.hears('📝 Buat Pesan', (ctx) => {
-  ctx.reply(
-    'Pilih:',
-    Markup.keyboard([
-      ['Login'],
-      ['Restricted']
-    ]).resize()
-  )
-})
+    if (!user || user.emails.length === 0) {
+      userState[id] = null
+      return ctx.reply('Please add email first ❌')
+    }
 
-// LOGIN
-bot.hears('Login', async (ctx) => {
-  await initDB()
-
-  const user = db.data.users[ctx.from.id]
-  if (!user || user.emails.length === 0) {
-    return ctx.reply('Tambahkan email dulu ❌')
-  }
-
-  ctx.reply('Masukkan nomor:')
-
-  bot.once('text', async (ctx2) => {
-    const nomor = ctx2.message.text
+    const number = ctx.message.text
     const email = getNextEmail(user)
 
-    let pesan = templates.login
+    let message = templates[state.type]
       .replace('{email}', email)
-      .replace('{nomor}', nomor)
+      .replace('{number}', number)
 
     await db.write()
-    ctx2.reply(pesan)
-  })
-})
 
-// RESTRICTED
-bot.hears('Restricted', async (ctx) => {
-  await initDB()
+    userState[id] = null
 
-  const user = db.data.users[ctx.from.id]
-  if (!user || user.emails.length === 0) {
-    return ctx.reply('Tambahkan email dulu ❌')
+    return ctx.reply(message)
   }
-
-  ctx.reply('Masukkan nomor:')
-
-  bot.once('text', async (ctx2) => {
-    const nomor = ctx2.message.text
-    const email = getNextEmail(user)
-
-    let pesan = templates.restricted
-      .replace('{email}', email)
-      .replace('{nomor}', nomor)
-
-    await db.write()
-    ctx2.reply(pesan)
-  })
 })
 
 bot.launch()
