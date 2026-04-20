@@ -3,157 +3,271 @@ const { Low, JSONFile } = require('lowdb')
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-// Database
+// 🔐 OWNER
+const OWNER_ID = 6086899243
+
 const db = new Low(new JSONFile('db.json'))
 
 async function initDB() {
   await db.read()
-  db.data ||= { users: {} }
+  db.data ||= { users: {}, whitelist: [OWNER_ID] }
 }
 
-// Rolling email system
-function getNextEmail(user) {
-  if (!user.emails || user.emails.length === 0) return null
+// 🔐 ACCESS CHECK
+function isAllowed(id) {
+  return db.data.whitelist.includes(id)
+}
 
+function isOwner(id) {
+  return id === OWNER_ID
+}
+
+// 🧠 SESSION
+const session = {}
+function resetSession(id) {
+  session[id] = null
+}
+
+// 📱 FORMAT
+function formatNumber(num) {
+  if (num.startsWith('0')) return '+62' + num.slice(1)
+  if (!num.startsWith('+')) return '+' + num
+  return num
+}
+
+// 🔁 EMAIL ENGINE
+function getNextEmail(user) {
   user.lastIndex = (user.lastIndex || 0) % user.emails.length
   const email = user.emails[user.lastIndex]
+
+  user.stats ||= { total: 0 }
+  user.stats.total++
+
   user.lastIndex++
   return email
 }
 
-// Templates
+// TEMPLATE
 const templates = {
   login: `Dear WhatsApp Support Team,
 
-I hope this message finds you well.
+I am unable to log in.
 
-I am writing to kindly request assistance with my WhatsApp account. I am currently unable to log in and receive the message “cannot log in at this time”.
+• Email: {email}
+• Phone: {number}
 
-Below are my account details:
-• Email          : {email}
-• Phone Number   : {number}
-
-I would greatly appreciate it if you could help me resolve this login issue so I can regain access to my account as soon as possible.
-
-Thank you very much for your time and support. I look forward to your assistance.`,
+Thank you.`,
 
   restricted: `Dear WhatsApp Support Team,
 
-I hope you are doing well.
+My account is restricted.
 
-I am reaching out to appeal the restriction on my WhatsApp account. When I try to use the app, I see the message “Your account is restricted right now.”
+• Email: {email}
+• Phone: {number}
 
-Here are my account details:
-• Email          : {email}
-• Phone Number   : {number}
+Please review.
 
-I believe this may have been a mistake or I may have unintentionally violated a policy. I would really appreciate it if you could review my account and help lift the restriction so I can continue using WhatsApp normally.
-
-Thank you for your understanding and for taking the time to assist me. I am looking forward to your positive response.`
+Thanks.`
 }
 
-// Temporary state
-const userState = {}
+// MENU
+function menu(ctx) {
+  return ctx.reply(
+    '👑 PANEL',
+    Markup.inlineKeyboard([
+      [Markup.button.callback('➕ Add Email', 'add')],
+      [Markup.button.callback('📋 Emails', 'view')],
+      [Markup.button.callback('❌ Delete Email', 'delete')],
+      [Markup.button.callback('📝 Generate', 'gen')],
+      [Markup.button.callback('👥 Manage Users', 'users')]
+    ])
+  )
+}
 
-// Start
+// START
 bot.start(async (ctx) => {
   await initDB()
 
-  ctx.reply(
-    'Main Menu:',
-    Markup.keyboard([
-      ['➕ Add Email'],
-      ['📋 View Emails'],
-      ['📝 Generate Message']
-    ]).resize()
-  )
-})
-
-// Add Email
-bot.hears('➕ Add Email', (ctx) => {
-  userState[ctx.from.id] = 'awaiting_email'
-  ctx.reply('Please enter your email:')
-})
-
-// View Emails
-bot.hears('📋 View Emails', async (ctx) => {
-  await initDB()
-
-  const user = db.data.users[ctx.from.id]
-
-  if (!user || user.emails.length === 0) {
-    return ctx.reply('No emails saved ❌')
+  if (!isAllowed(ctx.from.id)) {
+    return ctx.reply('Access denied ❌')
   }
 
-  ctx.reply('Your emails:\n\n' + user.emails.join('\n'))
+  menu(ctx)
 })
 
-// Generate Message
-bot.hears('📝 Generate Message', (ctx) => {
-  userState[ctx.from.id] = 'choose_template'
+// 👥 USER MANAGEMENT (OWNER ONLY)
+bot.action('users', (ctx) => {
+  if (!isOwner(ctx.from.id)) return ctx.reply('Owner only ❌')
 
   ctx.reply(
-    'Select issue type:',
-    Markup.keyboard([
-      ['Login Issue'],
-      ['Account Restricted']
-    ]).resize()
+    'User Management:',
+    Markup.inlineKeyboard([
+      [Markup.button.callback('➕ Add User', 'add_user')],
+      [Markup.button.callback('📋 List Users', 'list_user')],
+      [Markup.button.callback('❌ Remove User', 'remove_user')]
+    ])
   )
 })
 
-// Handle template selection
-bot.hears(['Login Issue', 'Account Restricted'], (ctx) => {
-  const type = ctx.message.text === 'Login Issue' ? 'login' : 'restricted'
-
-  userState[ctx.from.id] = { step: 'awaiting_number', type }
-
-  ctx.reply('Enter phone number:')
+// ADD USER
+bot.action('add_user', (ctx) => {
+  session[ctx.from.id] = 'add_user'
+  ctx.reply('Send user ID:')
 })
 
-// Handle all text input
+// LIST USER
+bot.action('list_user', async (ctx) => {
+  await initDB()
+  ctx.reply(db.data.whitelist.join('\n'))
+})
+
+// REMOVE USER
+bot.action('remove_user', async (ctx) => {
+  session[ctx.from.id] = 'remove_user'
+  ctx.reply('Send user ID to remove:')
+})
+
+// ADD EMAIL
+bot.action('add', (ctx) => {
+  session[ctx.from.id] = 'add_email'
+  ctx.reply('Enter email:')
+})
+
+// VIEW EMAIL
+bot.action('view', async (ctx) => {
+  await initDB()
+  const user = db.data.users[ctx.from.id]
+
+  if (!user || user.emails.length === 0) return ctx.reply('No emails')
+
+  ctx.reply(user.emails.join('\n'))
+})
+
+// DELETE EMAIL
+bot.action('delete', async (ctx) => {
+  await initDB()
+  const user = db.data.users[ctx.from.id]
+
+  if (!user || user.emails.length === 0) return ctx.reply('No emails')
+
+  session[ctx.from.id] = 'delete_email'
+
+  ctx.reply(user.emails.map((e,i)=>`${i+1}. ${e}`).join('\n')+'\nSend number:')
+})
+
+// GENERATE
+bot.action('gen', (ctx) => {
+  session[ctx.from.id] = 'choose'
+
+  ctx.reply(
+    'Select:',
+    Markup.inlineKeyboard([
+      [Markup.button.callback('Login', 'login')],
+      [Markup.button.callback('Restricted', 'restricted')]
+    ])
+  )
+})
+
+bot.action('login', (ctx) => {
+  session[ctx.from.id] = { step: 'num', type: 'login' }
+  ctx.reply('Enter number:')
+})
+
+bot.action('restricted', (ctx) => {
+  session[ctx.from.id] = { step: 'num', type: 'restricted' }
+  ctx.reply('Enter number:')
+})
+
+// TEXT HANDLER
 bot.on('text', async (ctx) => {
   await initDB()
 
-  const state = userState[ctx.from.id]
-
-  if (!state) return
-
   const id = ctx.from.id
 
-  // Save email
-  if (state === 'awaiting_email') {
-    db.data.users[id] ||= { emails: [] }
+  if (!isAllowed(id)) return
 
-    db.data.users[id].emails.push(ctx.message.text)
-    await db.write()
+  const st = session[id]
+  if (!st) return
 
-    userState[id] = null
+  // ADD USER
+  if (st === 'add_user') {
+    const uid = parseInt(ctx.message.text)
 
-    return ctx.reply('Email added successfully ✅')
+    if (!db.data.whitelist.includes(uid)) {
+      db.data.whitelist.push(uid)
+      await db.write()
+    }
+
+    resetSession(id)
+    return ctx.reply('User added ✅')
   }
 
-  // Generate message
-  if (state.step === 'awaiting_number') {
+  // REMOVE USER
+  if (st === 'remove_user') {
+    const uid = parseInt(ctx.message.text)
+
+    db.data.whitelist = db.data.whitelist.filter(u => u !== uid)
+    await db.write()
+
+    resetSession(id)
+    return ctx.reply('User removed ❌')
+  }
+
+  // ADD EMAIL
+  if (st === 'add_email') {
+    db.data.users[id] ||= { emails: [] }
+    db.data.users[id].emails.push(ctx.message.text)
+
+    await db.write()
+    resetSession(id)
+
+    return ctx.reply('Saved ✅')
+  }
+
+  // DELETE EMAIL
+  if (st === 'delete_email') {
+    const user = db.data.users[id]
+    const i = parseInt(ctx.message.text) - 1
+
+    if (!user || !user.emails[i]) return ctx.reply('Invalid')
+
+    user.emails.splice(i,1)
+    await db.write()
+
+    resetSession(id)
+    return ctx.reply('Deleted')
+  }
+
+  // GENERATE
+  if (st.step === 'num') {
     const user = db.data.users[id]
 
     if (!user || user.emails.length === 0) {
-      userState[id] = null
-      return ctx.reply('Please add email first ❌')
+      resetSession(id)
+      return ctx.reply('Add email first')
     }
 
-    const number = ctx.message.text
+    const number = formatNumber(ctx.message.text)
     const email = getNextEmail(user)
 
-    let message = templates[state.type]
+    let msg = templates[st.type]
       .replace('{email}', email)
       .replace('{number}', number)
 
     await db.write()
+    resetSession(id)
 
-    userState[id] = null
+    const mailto = `mailto:support@whatsapp.com?body=${encodeURIComponent(msg)}`
 
-    return ctx.reply(message)
+    return ctx.reply(msg, {
+      ...Markup.inlineKeyboard([
+        [Markup.button.url('📧 Send Email', mailto)],
+        [Markup.button.callback('🔙 Menu', 'menu')]
+      ])
+    })
   }
 })
+
+bot.action('menu', (ctx) => menu(ctx))
 
 bot.launch()
