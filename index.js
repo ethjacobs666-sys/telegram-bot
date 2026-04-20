@@ -47,7 +47,7 @@ function panelText() {
 Select a feature below:`
 }
 
-// FUNGSI SENSOR EMAIL (Contoh: a8*******@gmail.com)
+// FUNGSI SENSOR EMAIL
 function maskEmail(email) {
   const parts = email.split('@');
   const name = parts[0];
@@ -204,11 +204,10 @@ Example: \`+628xxxx\``,
     )
 
     try {
-      // 💡 PERBAIKAN RUTE SMTP DI SINI (Memaksa rute via Port 465)
       const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
-        secure: true, // Gunakan SSL
+        secure: true,
         auth: {
           user: currentSender.email,
           pass: currentSender.pass
@@ -224,7 +223,6 @@ Example: \`+628xxxx\``,
 
       await transporter.sendMail(mailOptions)
 
-      // Clear state and rotate sender index (0 to 10)
       state[userId] = null
       currentSenderIndex = (currentSenderIndex + 1) % senders.length
 
@@ -247,7 +245,15 @@ Please wait before next request.`,
 
     } catch (error) {
       console.log('Nodemailer Error:', error)
-      return ctx.reply(`❌ *Failed to send email.* Connection error or invalid App Password.`, { parse_mode: 'Markdown' })
+      // 💡 INI BAGIAN YANG DIUBAH AGAR ERROR ASLI MUNCUL DI TELEGRAM
+      return ctx.reply(
+`❌ *Failed to send email.*
+
+*System Log:* \`${error.message}\`
+
+Bang, tolong fotokan/salin pesan error di atas ke saya biar ketahuan masalahnya apa.`, 
+        { parse_mode: 'Markdown' }
+      )
     }
   }
 })
@@ -259,6 +265,5 @@ bot.catch((err) => {
 
 bot.launch()
 
-// 💡 PERBAIKAN ANTI-BENTROK DI SINI (Mencegah Error 409)
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
