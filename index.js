@@ -110,7 +110,7 @@ System will automatically rotate sender email for every appeal submitted to prev
   )
 })
 
-// GUIDE
+// GUIDE (Teks tidak diubah)
 bot.action('guide', (ctx) => {
   ctx.answerCbQuery()
   return editPanel(ctx, 
@@ -147,37 +147,33 @@ bot.action(['type_login', 'type_restricted'], (ctx) => {
   return editPanel(ctx,
 `📨 *APPEAL REQUEST (${type.toUpperCase()})*
 
-Enter Phone Number and Contact Email separated by a comma.
+Enter Phone Number:
 
 Example:
-+628xxxx, your@email.com`,
++628xxxx`,
     [
       [Markup.button.callback('⬅️ Cancel & Back', 'menu')]
     ]
   )
 })
 
-// INPUT NUMBER & EMAIL -> PROCESS MAILING
+// INPUT NUMBER -> PROCESS MAILING
 bot.on('text', async (ctx) => {
   const userId = ctx.from.id
 
   if (state[userId] && state[userId].step === 'awaiting_data') {
-    const text = ctx.message.text
-    const parts = text.split(',')
+    const phone = ctx.message.text.trim()
+    const appealType = state[userId].type
 
-    if (parts.length < 2) {
+    if (phone.length < 5) {
       return ctx.reply(
 `⚠️ *INVALID FORMAT*
 
-Please use a comma to separate your data.
-Example: \`+628xxxx, your@email.com\``, 
+Please enter a valid phone number.
+Example: \`+628xxxx\``, 
         { parse_mode: 'Markdown' }
       )
     }
-
-    const phone = parts[0].trim()
-    const contactEmail = parts[1].trim()
-    const appealType = state[userId].type
 
     const currentSender = senders[currentSenderIndex]
 
@@ -186,12 +182,12 @@ Example: \`+628xxxx, your@email.com\``,
     }
 
     const emailBody = templates[appealType]
-      .replace('{email}', contactEmail)
+      .replace('{email}', currentSender.email)
       .replace('{phone}', phone)
 
     const processingMsg = await ctx.reply(
 `⏳ *PROCESSING APPEAL...*
-📧 Using Sender : \`${currentSender.email}\``, 
+📧 Using Sender & Contact : \`${currentSender.email}\``, 
       { parse_mode: 'Markdown' }
     )
 
@@ -221,9 +217,8 @@ Example: \`+628xxxx, your@email.com\``,
 `🚀 *REQUEST SUBMITTED*
 
 🎯 Target : ${phone}  
-📧 Email  : ${contactEmail}  
+📧 Email Used : ${currentSender.email}  
 ⚡ Status : SUCCESS  
-📤 Sender : \`${currentSender.email}\`
 
 ━━━━━━━━━━━━━━━
 Please wait before next request.`,
