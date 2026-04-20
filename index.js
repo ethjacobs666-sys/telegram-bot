@@ -2,13 +2,11 @@ const { Telegraf, Markup } = require('telegraf')
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-// 🎬 VIDEO ID (SUDAH FIX)
-const VIDEO_ID = 'BAACAgUAAxkBAAMqaeYr8ve9kCfCx1-Z8S53f0qLd-WAAjAdAAJSUj1XdJXeruoBFhM7BA'
+// 🎬 VIDEO DARI KAMU (SUDAH FIX)
+const VIDEO_URL = 'https://files.catbox.moe/7fhl1n.mp4'
 
-// state
 const state = {}
 
-// PANEL TEXT
 function panelText() {
   return `👑 *SILENT APPEAL SYSTEM*
 
@@ -23,10 +21,10 @@ function panelText() {
 Select a feature below:`
 }
 
-// START (WAJIB RESPON)
+// START (PASTI RESPON)
 bot.start(async (ctx) => {
   try {
-    await ctx.replyWithVideo(VIDEO_ID, {
+    await ctx.replyWithVideo(VIDEO_URL, {
       caption: panelText(),
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -35,9 +33,9 @@ bot.start(async (ctx) => {
         [Markup.button.callback('📘 Guide', 'guide')]
       ])
     })
-  } catch (err) {
-    console.log(err)
-    ctx.reply('Bot running but video failed ❌')
+  } catch (e) {
+    console.log(e)
+    ctx.reply('Video failed ❌ but bot is alive')
   }
 })
 
@@ -50,7 +48,7 @@ function editPanel(ctx, text, buttons) {
 }
 
 // MENU APPEAL
-bot.action('appeal', async (ctx) => {
+bot.action('appeal', (ctx) => {
   ctx.answerCbQuery()
 
   return editPanel(ctx,
@@ -69,7 +67,7 @@ Choose action:`,
 })
 
 // BACK MENU
-bot.action('menu', async (ctx) => {
+bot.action('menu', (ctx) => {
   ctx.answerCbQuery()
 
   return editPanel(ctx, panelText(), [
@@ -80,7 +78,7 @@ bot.action('menu', async (ctx) => {
 })
 
 // START APPEAL
-bot.action('start', async (ctx) => {
+bot.action('start', (ctx) => {
   ctx.answerCbQuery()
 
   state[ctx.from.id] = 'number'
@@ -99,13 +97,9 @@ Example:
 })
 
 // INPUT NUMBER
-bot.on('text', async (ctx) => {
-  const st = state[ctx.from.id]
-  if (!st) return
-
-  if (st === 'number') {
+bot.on('text', (ctx) => {
+  if (state[ctx.from.id] === 'number') {
     const number = ctx.message.text
-
     state[ctx.from.id] = null
 
     return ctx.reply(
@@ -127,10 +121,9 @@ Please wait before next request.`,
   }
 })
 
-// ERROR HANDLER (BIAR GA DIAM)
+// ERROR HANDLER
 bot.catch((err) => {
   console.log('Error:', err)
 })
 
-// LAUNCH
 bot.launch()
