@@ -270,4 +270,8 @@ bot.on('text', async (ctx) => {
 
 bot.action('menu', (ctx) => menu(ctx))
 
+bot.on('message', (ctx) => {
+  console.log(JSON.stringify(ctx.message, null, 2))
+})
+
 bot.launch()
