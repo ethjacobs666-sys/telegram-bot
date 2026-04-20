@@ -204,10 +204,12 @@ Example: \`+628xxxx\``,
     )
 
     try {
+      // 💡 PERBAIKAN JALUR KONEKSI KE PORT 587 (STARTTLS)
       const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        port: 587,
+        secure: false, // Upgrade otomatis ke STARTTLS
+        requireTLS: true,
         auth: {
           user: currentSender.email,
           pass: currentSender.pass
@@ -245,13 +247,12 @@ Please wait before next request.`,
 
     } catch (error) {
       console.log('Nodemailer Error:', error)
-      // 💡 INI BAGIAN YANG DIUBAH AGAR ERROR ASLI MUNCUL DI TELEGRAM
       return ctx.reply(
 `❌ *Failed to send email.*
 
-*System Log:* \`${error.message}\`
+System Log: \`${error.message}\`
 
-Bang, tolong fotokan/salin pesan error di atas ke saya biar ketahuan masalahnya apa.`, 
+Please check your network or App Password configuration.`, 
         { parse_mode: 'Markdown' }
       )
     }
