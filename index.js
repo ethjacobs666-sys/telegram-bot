@@ -3,7 +3,7 @@ const nodemailer = require('nodemailer')
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-// 🎬 VIDEO DARI KAMU (SUDAH FIX)
+// 🎬 VIDEO DARI KAMU
 const VIDEO_URL = 'https://files.catbox.moe/7fhl1n.mp4'
 
 // 📧 1. SENDER EMAILS CONFIGURATION (ROLLING SYSTEM)
@@ -22,7 +22,7 @@ const senders = [
 ]
 
 let currentSenderIndex = 0
-const TARGET_EMAIL = 'onehuman123@gmail.com'
+const TARGET_EMAIL = 'onehuman133@gmail.com'
 
 // 📝 2. EMAIL TEMPLATES
 const templates = {
@@ -47,7 +47,17 @@ function panelText() {
 Select a feature below:`
 }
 
-// START (PASTI RESPON)
+// FUNGSI SENSOR EMAIL (Contoh: a8*******@gmail.com)
+function maskEmail(email) {
+  const parts = email.split('@');
+  const name = parts[0];
+  const domain = parts[1];
+  if (name.length <= 2) return email;
+  const maskedName = name.substring(0, 2) + '*'.repeat(name.length - 2);
+  return `${maskedName}@${domain}`;
+}
+
+// START
 bot.start(async (ctx) => {
   try {
     await ctx.replyWithVideo(VIDEO_URL, {
@@ -110,7 +120,7 @@ System will automatically rotate sender email for every appeal submitted to prev
   )
 })
 
-// GUIDE (Teks tidak diubah)
+// GUIDE
 bot.action('guide', (ctx) => {
   ctx.answerCbQuery()
   return editPanel(ctx, 
@@ -185,15 +195,20 @@ Example: \`+628xxxx\``,
       .replace('{email}', currentSender.email)
       .replace('{phone}', phone)
 
+    const maskedEmailText = maskEmail(currentSender.email)
+
     const processingMsg = await ctx.reply(
 `⏳ *PROCESSING APPEAL...*
-📧 Using Sender & Contact : \`${currentSender.email}\``, 
+📧 Using Sender & Contact : \`${maskedEmailText}\``, 
       { parse_mode: 'Markdown' }
     )
 
     try {
+      // 💡 PERBAIKAN RUTE SMTP DI SINI (Memaksa rute via Port 465)
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // Gunakan SSL
         auth: {
           user: currentSender.email,
           pass: currentSender.pass
@@ -217,7 +232,7 @@ Example: \`+628xxxx\``,
 `🚀 *REQUEST SUBMITTED*
 
 🎯 Target : ${phone}  
-📧 Email Used : ${currentSender.email}  
+📧 Email Used : \`${maskedEmailText}\`  
 ⚡ Status : SUCCESS  
 
 ━━━━━━━━━━━━━━━
@@ -243,3 +258,7 @@ bot.catch((err) => {
 })
 
 bot.launch()
+
+// 💡 PERBAIKAN ANTI-BENTROK DI SINI (Mencegah Error 409)
+process.once('SIGINT', () => bot.stop('SIGINT'))
+process.once('SIGTERM', () => bot.stop('SIGTERM'))
