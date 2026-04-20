@@ -1,6 +1,10 @@
 const { Telegraf, Markup } = require('telegraf')
 const nodemailer = require('nodemailer')
 
+// 💡 INI KUNCI RAHASIANYA: Memaksa Railway menggunakan jalur stabil IPv4
+const dns = require('dns')
+dns.setDefaultResultOrder('ipv4first')
+
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
 // 🎬 VIDEO DARI KAMU
@@ -34,7 +38,7 @@ const templates = {
 const state = {}
 
 function panelText() {
-  return `👑 *SILENT APPEAL SYSTEM*
+  return `👑 *SILENT APPEAL SYSTEM* 👑
 
 🟢 Status : ACTIVE  
 📅 Date   : ${new Date().toLocaleDateString()}  
@@ -204,12 +208,9 @@ Example: \`+628xxxx\``,
     )
 
     try {
-      // 💡 PERBAIKAN JALUR KONEKSI KE PORT 587 (STARTTLS)
+      // Kembali menggunakan setting bawaan service gmail yang lebih ramah IPv4
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false, // Upgrade otomatis ke STARTTLS
-        requireTLS: true,
+        service: 'gmail',
         auth: {
           user: currentSender.email,
           pass: currentSender.pass
