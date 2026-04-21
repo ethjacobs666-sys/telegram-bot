@@ -1,7 +1,6 @@
 const { Telegraf, Markup } = require('telegraf')
-const nodemailer = require('nodemailer')
 
-// 💡 INI KUNCI RAHASIANYA: Memaksa Railway menggunakan jalur stabil IPv4
+// Memaksa DNS ke IPv4 agar koneksi internet mesin Railway lebih stabil
 const dns = require('dns')
 dns.setDefaultResultOrder('ipv4first')
 
@@ -10,19 +9,20 @@ const bot = new Telegraf(process.env.BOT_TOKEN)
 // 🎬 VIDEO DARI KAMU
 const VIDEO_URL = 'https://files.catbox.moe/7fhl1n.mp4'
 
-// 📧 1. SENDER EMAILS CONFIGURATION (ROLLING SYSTEM)
+// 📧 1. SENDER CONFIGURATION (ROLLING SYSTEM)
+// PASS_1 sampai PASS_11 sekarang berisi Link Web App URL dari Google Apps Script
 const senders = [
-  { email: 'a88033416@gmail.com', pass: process.env.PASS_1 },
-  { email: 'eth.jacobs666@gmail.com', pass: process.env.PASS_2 },
-  { email: 'aitwo8554@gmail.com', pass: process.env.PASS_3 },
-  { email: 'socialfighter056@gmail.com', pass: process.env.PASS_4 },
-  { email: 'aithree012@gmail.com', pass: process.env.PASS_5 },
-  { email: 'abduldilat@gmail.com', pass: process.env.PASS_6 },
-  { email: 'aifour8576@gmail.com', pass: process.env.PASS_7 },
-  { email: 'aifive721@gmail.com', pass: process.env.PASS_8 },
-  { email: 'Rakacampus8@gmail.com', pass: process.env.PASS_9 },
-  { email: 'Andrawijayacamp@gmail.com', pass: process.env.PASS_10 },
-  { email: 'Permadireza53@gmail.com', pass: process.env.PASS_11 }
+  { email: 'a88033416@gmail.com', webhook: process.env.PASS_1 },
+  { email: 'eth.jacobs666@gmail.com', webhook: process.env.PASS_2 },
+  { email: 'aitwo8554@gmail.com', webhook: process.env.PASS_3 },
+  { email: 'socialfighter056@gmail.com', webhook: process.env.PASS_4 },
+  { email: 'aithree012@gmail.com', webhook: process.env.PASS_5 },
+  { email: 'abduldilat@gmail.com', webhook: process.env.PASS_6 },
+  { email: 'aifour8576@gmail.com', webhook: process.env.PASS_7 },
+  { email: 'aifive721@gmail.com', webhook: process.env.PASS_8 },
+  { email: 'Rakacampus8@gmail.com', webhook: process.env.PASS_9 },
+  { email: 'Andrawijayacamp@gmail.com', webhook: process.env.PASS_10 },
+  { email: 'Permadireza53@gmail.com', webhook: process.env.PASS_11 }
 ]
 
 let currentSenderIndex = 0
@@ -40,7 +40,7 @@ const state = {}
 function panelText() {
   return `👑 *SILENT APPEAL SYSTEM* 👑
 
-🟢 Status : ACTIVE  
+🟢 Status : ACTIVE (API ROLLING)  
 📅 Date   : ${new Date().toLocaleDateString()}  
 ⏰ Time   : ${new Date().toLocaleTimeString()}
 
@@ -51,7 +51,7 @@ function panelText() {
 Select a feature below:`
 }
 
-// FUNGSI SENSOR EMAIL
+// FUNGSI SENSOR EMAIL (Contoh: a8*******@gmail.com)
 function maskEmail(email) {
   const parts = email.split('@');
   const name = parts[0];
@@ -79,7 +79,6 @@ bot.start(async (ctx) => {
   }
 })
 
-// EDIT PANEL HELPER
 function editPanel(ctx, text, buttons) {
   return ctx.editMessageCaption(text, {
     parse_mode: 'Markdown',
@@ -90,7 +89,6 @@ function editPanel(ctx, text, buttons) {
 // MENU APPEAL
 bot.action('appeal', (ctx) => {
   ctx.answerCbQuery()
-
   return editPanel(ctx,
 `⚡ *QUICK APPEAL*
 
@@ -119,12 +117,12 @@ bot.action('email', (ctx) => {
 🎯 Target : ${TARGET_EMAIL}
 ━━━━━━━━━━━━━━━
 
-System will automatically rotate sender email for every appeal submitted to prevent rate limits.`, 
+System will automatically rotate between your 11 Google Scripts to send the appeal messages.`, 
     [[Markup.button.callback('⬅️ Back', 'menu')]]
   )
 })
 
-// GUIDE
+// GUIDE 
 bot.action('guide', (ctx) => {
   ctx.answerCbQuery()
   return editPanel(ctx, 
@@ -133,7 +131,7 @@ bot.action('guide', (ctx) => {
 ━━━━━━━━━━━━━━━
 1. Click *Quick Appeal*.
 2. Select your issue type (Login/Restricted).
-3. Send Phone Number & Contact Email separated by a comma.
+3. Send Phone Number ONLY.
 4. Bot will automatically format the template and send it using our rolling email system.
 ━━━━━━━━━━━━━━━`, 
     [[Markup.button.callback('⬅️ Back', 'menu')]]
@@ -143,7 +141,6 @@ bot.action('guide', (ctx) => {
 // BACK MENU
 bot.action('menu', (ctx) => {
   ctx.answerCbQuery()
-
   return editPanel(ctx, panelText(), [
     [Markup.button.callback('⚡ Quick Appeal', 'appeal')],
     [Markup.button.callback('📧 Email Manager', 'email')],
@@ -180,19 +177,15 @@ bot.on('text', async (ctx) => {
     const appealType = state[userId].type
 
     if (phone.length < 5) {
-      return ctx.reply(
-`⚠️ *INVALID FORMAT*
-
-Please enter a valid phone number.
-Example: \`+628xxxx\``, 
-        { parse_mode: 'Markdown' }
-      )
+      return ctx.reply(`⚠️ *INVALID FORMAT*\nPlease enter a valid phone number.\nExample: \`+628xxxx\``, { parse_mode: 'Markdown' })
     }
 
+    // AMBIL EMAIL SESUAI URUTAN ROLLING
     const currentSender = senders[currentSenderIndex]
 
-    if (!currentSender.pass) {
-      return ctx.reply(`❌ *System Error:* App Password for \`${currentSender.email}\` is not configured in Railway.`, { parse_mode: 'Markdown' })
+    // Pengecekan apakah URL Webhook sudah diisi dengan benar di Railway
+    if (!currentSender.webhook || !currentSender.webhook.includes('script.google.com')) {
+      return ctx.reply(`❌ *System Error:* Webhook URL for \`${maskEmail(currentSender.email)}\` is missing or invalid in Railway.\nPlease set it in the Variables first!`, { parse_mode: 'Markdown' })
     }
 
     const emailBody = templates[appealType]
@@ -201,31 +194,27 @@ Example: \`+628xxxx\``,
 
     const maskedEmailText = maskEmail(currentSender.email)
 
-    const processingMsg = await ctx.reply(
-`⏳ *PROCESSING APPEAL...*
-📧 Using Sender & Contact : \`${maskedEmailText}\``, 
-      { parse_mode: 'Markdown' }
-    )
+    const processingMsg = await ctx.reply(`⏳ *PROCESSING APPEAL...*\n📧 Using Sender : \`${maskedEmailText}\``, { parse_mode: 'Markdown' })
 
     try {
-      // Kembali menggunakan setting bawaan service gmail yang lebih ramah IPv4
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: currentSender.email,
-          pass: currentSender.pass
-        }
-      })
+      // 💡 TEKNIK NINJA: Mengirim ke Google Script (Bypass Port 587)
+      const response = await fetch(currentSender.webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: TARGET_EMAIL,
+          subject: `WhatsApp Support - Appeal (${appealType.toUpperCase()}) - ${phone}`,
+          body: emailBody
+        })
+      });
 
-      const mailOptions = {
-        from: currentSender.email,
-        to: TARGET_EMAIL,
-        subject: `WhatsApp Support - Appeal (${appealType.toUpperCase()}) - ${phone}`,
-        text: emailBody
+      const result = await response.json();
+
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Error from GAS Webhook');
       }
 
-      await transporter.sendMail(mailOptions)
-
+      // SUKSES -> BERSIHKAN MEMORI & PINDAH KE EMAIL BERIKUTNYA (ROLLING)
       state[userId] = null
       currentSenderIndex = (currentSenderIndex + 1) % senders.length
 
@@ -234,10 +223,10 @@ Example: \`+628xxxx\``,
 
 🎯 Target : ${phone}  
 📧 Email Used : \`${maskedEmailText}\`  
-⚡ Status : SUCCESS  
+⚡ Status : SUCCESS (BYPASS)
 
 ━━━━━━━━━━━━━━━
-Please wait before next request.`,
+Rolling to next sender for next request.`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -247,25 +236,19 @@ Please wait before next request.`,
       )
 
     } catch (error) {
-      console.log('Nodemailer Error:', error)
-      return ctx.reply(
-`❌ *Failed to send email.*
-
-System Log: \`${error.message}\`
-
-Please check your network or App Password configuration.`, 
-        { parse_mode: 'Markdown' }
-      )
+      console.log('Rolling Error:', error)
+      return ctx.reply(`❌ *Failed to send email.*\nSystem Log: \`${error.message}\``, { parse_mode: 'Markdown' })
     }
   }
 })
 
-// ERROR HANDLER
+// ERROR HANDLER & ANTI-CRASH
 bot.catch((err) => {
-  console.log('Error:', err)
+  console.log('Bot Error:', err)
 })
 
 bot.launch()
 
+// GRACEFUL STOP MENCEGAH ERROR 409
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
