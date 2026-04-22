@@ -40,10 +40,8 @@ const templates = {
 const state = {}
 
 function panelText(isVip) {
-  // Mode akun bersih tanpa emoji
   const mode = isVip ? 'VIP PREMIUM' : 'FREE TIER'
   
-  // Update Jam ke Waktu Indonesia Barat (WIB) secara Real-Time
   const now = new Date();
   const dateStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' });
   const timeStr = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -119,7 +117,7 @@ bot.action('upgrade', (ctx) => {
 
 bot.action('guide', (ctx) => {
   ctx.answerCbQuery()
-  return editPanel(ctx, `📘 *CARA PAKE BOT*\n\n━━━━━━━━━━━━━━━\n1. Klik *Quick Appeal*.\n2. Pilih tipe masalahnya.\n3. Masukin Nomor HP doang.\n4. Sistem kita yang otomatis ngerolling emailnya.\n━━━━━━━━━━━━━━━`, [[Markup.button.callback('⬅️ Back', 'menu')]])
+  return editPanel(ctx, `📘 *CARA PAKE BOT*\n\n━━━━━━━━━━━━━━━\n1. Klik *Quick Appeal*.\n2. Pilih tipe masalahnya.\n3. Masukin Nomor HP (Wajib +62).\n4. Sistem kita yang otomatis ngerolling emailnya.\n━━━━━━━━━━━━━━━`, [[Markup.button.callback('⬅️ Back', 'menu')]])
 })
 
 // Milih tipe masalah
@@ -127,7 +125,7 @@ bot.action(['type_login', 'type_restricted', 'type_banned'], (ctx) => {
   ctx.answerCbQuery()
   const type = ctx.match[0].replace('type_', '')
   state[ctx.from.id] = { step: 'awaiting_data', type: type }
-  return editPanel(ctx, `📨 *APPEAL REQUEST (${type.toUpperCase()})*\n\nKirim nomor WA target lu ke sini:\n\nContoh:\n+628xxxx`, [[Markup.button.callback('⬅️ Batal & Back', 'menu')]])
+  return editPanel(ctx, `📨 *APPEAL REQUEST (${type.toUpperCase()})*\n\nKirim nomor WA target lu ke sini:\n\n*(Wajib pakai +62 ya bro!)*\nContoh:\n+628xxxx`, [[Markup.button.callback('⬅️ Batal & Back', 'menu')]])
 })
 
 // Eksekusi ngirim email
@@ -144,15 +142,15 @@ bot.on('text', async (ctx) => {
       return ctx.reply(`⚠️ *Yahh, Limit Habis Bro!*\n\nJatah free lu udah kepake nih.\nGas upgrade ke VIP kuy biar bisa spam unlimited! 🚀`, { parse_mode: 'Markdown' })
     }
 
-    // Validasi input nomor
-    if (phone.length < 5) {
-      return ctx.reply(`⚠️ *Format Salah Coy!*\nMasukin nomor yang bener ya, contoh: \`+628xxxx\``, { parse_mode: 'Markdown' })
+    // 💡 VALIDASI INPUT NOMOR (WAJIB +62 DAN MINIMAL 10 ANGKA)
+    if (!phone.startsWith('+62') || phone.length < 10) {
+      return ctx.reply(`⚠️ *Format Salah Coy!*\nNomor WA wajib diawali dengan \`+62\` ya bro.\n\nContoh yang bener: \`+6281234567890\``, { parse_mode: 'Markdown' })
     }
 
     const currentSender = senders[currentSenderIndex]
     const emailBody = templates[appealType].replace('{phone}', phone)
     
-    // Tampilan Loading (Tunggu bentar)
+    // Tampilan Loading
     const processingMsg = await ctx.reply(`⏳ *Wait ya, lagi di-proses nih...*\n📧 Pake Sender : \`${maskEmail(currentSender.email)}\``, { parse_mode: 'Markdown' })
 
     try {
@@ -172,7 +170,7 @@ bot.on('text', async (ctx) => {
         if (!isVip) freeUserUsage[userId] = 1
         currentSenderIndex = (currentSenderIndex + 1) % senders.length
         
-        // Tampilan Sukses (Ngedit pesan yang loading tadi)
+        // Tampilan Sukses 
         return ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
 `🚀 *REQUEST DONE!*
 
@@ -181,14 +179,13 @@ bot.on('text', async (ctx) => {
 ⚡ Status : *Sukses nembus WA!*
 
 ━━━━━━━━━━━━━━━
-_Sistem otomatis rolling ke email next-nya..._`, 
+_⏳ Tunggu sekitar 30 detik, terus coba tes login WA lu lagi ya cuy!_`, 
           { parse_mode: 'Markdown' }
         )
       } else {
         throw new Error(result.message || 'Error dari sananya bro')
       }
     } catch (error) {
-      // Tampilan Gagal (Ngedit pesan loading kalau ada masalah)
       return ctx.telegram.editMessageText(ctx.chat.id, processingMsg.message_id, null,
 `❌ *Waduh, Gagal Bro!*\nSystem Log: \`${error.message}\``, 
         { parse_mode: 'Markdown' }
