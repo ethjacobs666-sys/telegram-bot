@@ -40,12 +40,19 @@ const templates = {
 const state = {}
 
 function panelText(isVip) {
-  const mode = isVip ? '🌟 VIP PREMIUM' : '🆓 FREE TIER (Limit 1x)'
+  // Mode akun bersih tanpa emoji
+  const mode = isVip ? 'VIP PREMIUM' : 'FREE TIER'
+  
+  // Update Jam ke Waktu Indonesia Barat (WIB) secara Real-Time
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const timeStr = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
   return `👑 *SILENT APPEAL SYSTEM* 👑
 
-🟢 Status : ACTIVE (API Rolling)  
-📅 Date   : ${new Date().toLocaleDateString()}  
-⏰ Time   : ${new Date().toLocaleTimeString()}
+🟢 Status : ACTIVE
+📅 Date   : ${dateStr}  
+⏰ Time   : ${timeStr} WIB
 
 ━━━━━━━━━━━━━━━
 💎 Account : ${mode}
